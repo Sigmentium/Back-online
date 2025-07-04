@@ -11,7 +11,7 @@ let BullsCows = [];
 // function GenerateId() {}
 
 function Send(to, type, data) {
-    const data = JSON.parse(data);
+    data = JSON.parse(data);
 
     switch (type) {
         case 'Info-Tsu-E-Fa':
