@@ -5,12 +5,16 @@ const port = process.env.PORT || 1000;
 const wss = new WebSocket.Server({ port });
 ///////////////////////////////////////////
 
+let Count = 0;
+let Player, Opponent;
+let TsuEFaItems = new Map();
+
 let TsuEFa = [];
 let BullsCows = [];
 
 // function GenerateId() {}
 
-function Send(to, type, data) {
+function Send(to, type, data = '{}') {
     data = JSON.parse(data);
 
     switch (type) {
@@ -22,26 +26,24 @@ function Send(to, type, data) {
             break;
         case 'Win':
             to.send(JSON.stringify({
-                type: 'Win',
-                item: data.item
+                type: 'Win'
             }));
             break;
         case 'Defeat':
             to.send(JSON.stringify({
-                type: 'Defeat',
-                item: data.item
+                type: 'Defeat'
             }));
             break;
         case 'Draw':
             to.send(JSON.stringify({
-                type: 'Draw',
-                item: data.item
+                type: 'Draw'
             }));
             break;
         case 'Connected':
             to.send(JSON.stringify({
                 type: 'Connected',
-                opponent: data.UserId
+                UserId: data.UserId,
+                Name: data.Name
             }));
             break;
         case 'Disconnected':
@@ -52,34 +54,48 @@ function Send(to, type, data) {
     }
 }
 
-wss.on('connection', (ws) => {
-    let Opponent;
-    let TsuEFaItems = {};
+function Winner(Player, Opponent, PlayerConnection, OpponentConnection) {
+    if (Player === Opponent) {
+        Count = 0;
+        Player = undefined;
+        Opponent = undefined;
+        TsuEFaItems.clear();
 
+        Send(PlayerConnection, 'Draw');
+        Send(OpponentConnection, 'Draw');
+    }
+    else if ((Player === 'Камень' && Opponent === 'Ножницы') ||
+             (Player === 'Ножницы' && Opponent === 'Бумага') ||
+             (Player === 'Бумага' && Opponent === 'Камень')) {
+        Count = 0;
+        Player = undefined;
+        Opponent = undefined;
+        TsuEFaItems.clear();
+
+        Send(PlayerConnection, 'Win');
+        Send(OpponentConnection, 'Defeat');
+    }
+    else {
+        Count = 0;
+        Player = undefined;
+        Opponent = undefined;
+        TsuEFaItems.clear();
+
+        Send(PlayerConnection, 'Defeat');
+        Send(OpponentConnection, 'Win');
+    }
+}
+
+wss.on('connection', (ws) => {
     ws.on('message', (msg) => {
         const data = JSON.parse(msg);
 
         if (data.type === 'Info-Tsu-E-Fa') {
-            if (Object.keys(TsuEFaItems).length === 2) {
-                const obj = Object.keys(TsuEFaItems);
+            Count++;
+            TsuEFaItems.set(Player.Connection, data.item);
 
-                if (obj[0] === obj[1]) {
-                    Send(obj[0], 'Draw');
-                    Send(obj[1], 'Draw');
-                }
-                else if ((TsuEFaItems[ws] === 'Камень' && TsuEFaItems[Opponent.Connection] === 'Ножницы') ||
-                         (TsuEFaItems[ws] === 'Ножницы' && TsuEFaItems[Opponent.Connection] === 'Бумага') ||
-                         (TsuEFaItems[ws] === 'Бумага' && TsuEFaItems[Opponent.Connection] === 'Камень')) {            
-                    Send(ws, 'Win');
-                    Send(Opponent.Connection, 'Defeat');
-                }
-                else {
-                    Send(ws, 'Defeat');
-                    Send(Opponent.Connection, 'Win');
-                }
-            }
-            else {
-                TsuEFaItems[ws] = data.item;
+            if (Count === 2) {
+                Winner(TsuEFaItems.get(Player.Connection), TsuEFaItems.get(Opponent.Connection), Player.Connection, Opponent.Connection);
             }
         }
         else if (data.type ===  'Connected') {
@@ -88,6 +104,7 @@ wss.on('connection', (ws) => {
                     TsuEFa.push({ UserId: data.UserId, Name: data.Name, Connection: ws });
                 }
                 else {
+                    Player = { UserId: data.UserId, Name: data.Name, Connection: ws };
                     Opponent = TsuEFa[0];
         
                     Send(ws, 'Connected', JSON.stringify({ UserId: Opponent.UserId, Name: Opponent.Name }));
@@ -96,19 +113,6 @@ wss.on('connection', (ws) => {
                     TsuEFa.shift();
                 }
             }
-            // else if (data.game === 'Bulls-Cows') {
-            //     if (BullsCows.length < 1) {
-            //         BullsCows.push({ 'UserId': data.UserId, 'Connection': ws });
-            //     }
-            //     else {
-            //         Opponent = BullsCows[0];
-
-            //         Send(ws, 'Connected', JSON.stringify({ UserId: Opponent.UserId}));
-            //         Send(Opponent.Connection, 'Connected', JSON.stringify({ UserId: data.UserId }));
-
-            //         BullsCows.shift();
-            //     }
-            // }
         }
     });
 
