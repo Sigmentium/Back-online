@@ -20,9 +20,27 @@ function Send(to, type, data) {
                 item: data.item
             }));
             break;
+        case 'Win':
+            to.send(JSON.stringify({
+                type: 'Win',
+                item: data.item
+            }));
+            break;
+        case 'Defeat':
+            to.send(JSON.stringify({
+                type: 'Defeat',
+                item: data.item
+            }));
+            break;
+        case 'Draw':
+            to.send(JSON.stringify({
+                type: 'Draw',
+                item: data.item
+            }));
+            break;
         case 'Connected':
             to.send(JSON.stringify({
-                type: 'Found',
+                type: 'Connected',
                 opponent: data.UserId
             }));
             break;
@@ -36,23 +54,44 @@ function Send(to, type, data) {
 
 wss.on('connection', (ws) => {
     let Opponent;
+    let TsuEFaItems = {};
 
     ws.on('message', (msg) => {
         const data = JSON.parse(msg);
 
         if (data.type === 'Info-Tsu-E-Fa') {
-            Send(Opponent.Connection, 'Info-Tsu-E-Fa', JSON.stringify({ item: data.item }));
+            if (Object.keys(TsuEFaItems).length === 2) {
+                const obj = Object.keys(TsuEFaItems);
+
+                if (obj[0] === obj[1]) {
+                    Send(obj[0], 'Draw');
+                    Send(obj[1], 'Draw');
+                }
+                else if ((TsuEFaItems[ws] === 'Камень' && TsuEFaItems[Opponent.Connection] === 'Ножницы') ||
+                         (TsuEFaItems[ws] === 'Ножницы' && TsuEFaItems[Opponent.Connection] === 'Бумага') ||
+                         (TsuEFaItems[ws] === 'Бумага' && TsuEFaItems[Opponent.Connection] === 'Камень')) {            
+                    Send(ws, 'Win');
+                    Send(Opponent.Connection, 'Defeat');
+                }
+                else {
+                    Send(ws, 'Defeat');
+                    Send(Opponent.Connection, 'Win');
+                }
+            }
+            else {
+                TsuEFaItems[ws] = data.item;
+            }
         }
         else if (data.type ===  'Connected') {
             if (data.game === 'Tsu-E-Fa') {
                 if (TsuEFa.length < 1) {
-                    TsuEFa.push({ 'UserId': data.UserId, 'Connection': ws });
+                    TsuEFa.push({ UserId: data.UserId, Name: data.Name, Connection: ws });
                 }
                 else {
                     Opponent = TsuEFa[0];
         
-                    Send(ws, 'Connected', JSON.stringify({ UserId: Opponent.UserId }));
-                    Send(Opponent.Connection, 'Connected', JSON.stringify({ UserId: data.UserId }));
+                    Send(ws, 'Connected', JSON.stringify({ UserId: Opponent.UserId, Name: Opponent.Name }));
+                    Send(Opponent.Connection, 'Connected', JSON.stringify({ UserId: data.UserId, Name: data.Name }));
         
                     TsuEFa.shift();
                 }
